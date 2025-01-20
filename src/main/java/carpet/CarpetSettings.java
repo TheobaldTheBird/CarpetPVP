@@ -9,8 +9,8 @@ import carpet.settings.Rule;
 import carpet.utils.Translations;
 import carpet.utils.CommandHelper;
 import carpet.utils.Messenger;
-import carpet.utils.SpawnChunks;
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.loader.api.SemanticVersion;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -20,7 +20,6 @@ import net.minecraft.server.dedicated.DedicatedServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -50,8 +49,11 @@ import static carpet.api.settings.RuleCategory.CLIENT;
 public class CarpetSettings
 {
     public static final String carpetVersion = FabricLoader.getInstance().getModContainer("carpet").orElseThrow().getMetadata().getVersion().toString();
-    public static final String releaseTarget = "1.19.4";
-    public static final Logger LOG = LoggerFactory.getLogger("carpet");
+    public static final int [] releaseTarget =  {
+            ((SemanticVersion)FabricLoader.getInstance().getModContainer("minecraft").orElseThrow().getMetadata().getVersion()).getVersionComponent(1),
+            ((SemanticVersion)FabricLoader.getInstance().getModContainer("minecraft").orElseThrow().getMetadata().getVersion()).getVersionComponent(2)
+    };
+    public static final Logger LOG = LoggerFactory.getLogger("carpet pvp");
     public static final ThreadLocal<Boolean> skipGenerationChecks = ThreadLocal.withInitial(() -> false);
     public static final ThreadLocal<Boolean> impendingFillSkipUpdates = ThreadLocal.withInitial(() -> false);
     public static int runPermissionLevel = 2;
@@ -147,36 +149,8 @@ public class CarpetSettings
     public static String carpetCommandPermissionLevel = "ops";
 
 
-
     @Rule(desc = "Gbhs sgnf sadsgras fhskdpri!!!", category = EXPERIMENTAL)
     public static boolean superSecretSetting = false;
-
-    @Rule(
-            desc = "Amount of delay ticks to use a nether portal in creative",
-            options = {"1", "40", "80", "72000"},
-            category = CREATIVE,
-            strict = false,
-            validate = OneHourMaxDelayLimit.class
-    )
-    public static int portalCreativeDelay = 1;
-
-    @Rule(
-            desc = "Amount of delay ticks to use a nether portal in survival",
-            options = {"1", "40", "80", "72000"},
-            category = SURVIVAL,
-            strict = false,
-            validate = OneHourMaxDelayLimit.class
-    )
-    public static int portalSurvivalDelay = 80;
-
-
-    private static class OneHourMaxDelayLimit extends Validator<Integer> {
-        @Override public Integer validate(CommandSourceStack source, CarpetRule<Integer> currentRule, Integer newValue, String string) {
-            return (newValue > 0 && newValue <= 72000) ? newValue : null;
-        }
-        @Override
-        public String description() { return "You must choose a value from 1 to 72000";}
-    }
 
     @Rule(desc = "Dropping entire stacks works also from on the crafting UI result slot", category = {RuleCategory.BUGFIX, SURVIVAL})
     public static boolean ctrlQCraftingFix = false;
@@ -348,7 +322,7 @@ public class CarpetSettings
             int minRange = 0;
             int maxRange = 1;
 
-            if (source == null) {
+            if (source == null || !source.getServer().isReady()) {
                 maxRange = Integer.MAX_VALUE;
             } else {
                 for (Level level : source.getServer().getAllLevels()) {
@@ -621,12 +595,13 @@ public class CarpetSettings
     @Rule(desc = "Disables breaking of blocks caused by flowing liquids", category = CREATIVE)
     public static boolean liquidDamageDisabled = false;
 
+
     @Rule(
             desc = "smooth client animations with low tps settings",
             extra = "works only in SP, and will slow down players",
             category = {CREATIVE, SURVIVAL, CLIENT}
     )
-    public static boolean smoothClientAnimations;
+    public static boolean smoothClientAnimations = true;
 
     private static class PushLimitLimits extends Validator<Integer> {
         @Override public Integer validate(CommandSourceStack source, CarpetRule<Integer> currentRule, Integer newValue, String string) {
@@ -652,43 +627,6 @@ public class CarpetSettings
             validate = PushLimitLimits.class
     )
     public static int railPowerLimit = 9;
-
-    private static class FillLimitMigrator extends Validator<Integer>
-    {
-        @Override
-        public Integer validate(CommandSourceStack source, CarpetRule<Integer> changingRule, Integer newValue, String userInput)
-        {
-            if (source != null && source.getServer().overworld() != null)
-            {
-                GameRules.IntegerValue gamerule = source.getServer().getGameRules().getRule(GameRules.RULE_COMMAND_MODIFICATION_BLOCK_LIMIT);
-                if (gamerule.get() != newValue)
-                {
-                    if (newValue == 32768 && changingRule.value() == newValue) // migration call, gamerule is different, update rule
-                    {
-                        Messenger.m(source, "g Syncing fillLimit rule with gamerule");
-                        newValue = gamerule.get();
-                    } else if (newValue != 32768 && gamerule.get() == 32768)
-                    {
-                        Messenger.m(source, "g Migrated value of fillLimit carpet rule to commandModificationBlockLimit gamerule");
-                        gamerule.set(newValue, source.getServer());
-                    }
-                }
-            }
-            return newValue;
-        }
-        @Override
-        public String description() { return "The value of this rule will be migrated to the gamerule";}
-    }
-
-    @Rule(
-            desc = "[Deprecated] Customizable fill/fillbiome/clone volume limit",
-            extra = "Use vanilla gamerule instead. This setting will be removed in 1.20.0",
-            options = {"32768", "250000", "1000000"},
-            category = CREATIVE,
-            strict = false,
-            validate = FillLimitMigrator.class
-    )
-    public static int fillLimit = 32768;
 
     private static class ForceloadLimitValidator extends Validator<Integer>
     {
@@ -834,37 +772,6 @@ public class CarpetSettings
             validate = SimulationDistanceValidator.class
     )
     public static int simulationDistance = 0;
-
-    public static class ChangeSpawnChunksValidator extends Validator<Integer> {
-        @Override public Integer validate(CommandSourceStack source, CarpetRule<Integer> currentRule, Integer newValue, String string) {
-            if (source == null) return newValue;
-            if (newValue < 0 || newValue > 32)
-            {
-                Messenger.m(source, "r spawn chunk size has to be between 0 and 32");
-                return null;
-            }
-            if (currentRule.value().intValue() == newValue.intValue())
-            {
-                //must been some startup thing
-                return newValue;
-            }
-            ServerLevel currentOverworld = source.getServer().overworld();
-            if (currentOverworld != null)
-            {
-                SpawnChunks.changeSpawnSize(currentOverworld, newValue);
-            }
-            return newValue;
-        }
-    }
-    @Rule(
-            desc = "Changes size of spawn chunks",
-            extra = {"Defines new radius", "setting it to 0 - disables spawn chunks"},
-            category = CREATIVE,
-            strict = false,
-            options = {"0", "11"},
-            validate = ChangeSpawnChunksValidator.class
-    )
-    public static int spawnChunksSize = MinecraftServer.START_CHUNK_RADIUS;
 
     public enum RenewableCoralMode {
         FALSE,
@@ -1127,4 +1034,10 @@ public class CarpetSettings
             category = {SURVIVAL, FEATURE}
     )
     public static FungusGrowthMode thickFungusGrowth = FungusGrowthMode.FALSE;
+
+    @Rule(
+            desc = "Enables shield-stunning, where the entity can be damaged immediately after the shield is disabled.",
+            category = {SURVIVAL, FEATURE}
+    )
+    public static boolean ShieldStunning = false;
 }
