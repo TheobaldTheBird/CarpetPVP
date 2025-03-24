@@ -269,7 +269,7 @@ public class EntityPlayerMPFake extends ServerPlayer
             if (damageSource.getDirectEntity() instanceof LivingEntity le && le.canDisableShield()) {
                 this.playSound(SoundEvents.SHIELD_BREAK, 0.8F, 0.8F + this.level().random.nextFloat() * 0.4F);
                 this.disableShield();
-                if(!CarpetSettings.shieldStunning) {
+                if(!CarpetSettings.ShieldStunning) {
                     this.invulnerableTime = 20;
                 }
                 String ign = this.getGameProfile().getName();
