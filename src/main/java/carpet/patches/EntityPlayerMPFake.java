@@ -7,7 +7,6 @@ import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.network.protocol.PacketFlow;
@@ -34,7 +33,6 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.SkullBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.portal.DimensionTransition;
 import net.minecraft.world.phys.Vec3;
 import carpet.fakes.ServerPlayerInterface;
 import carpet.utils.Messenger;
@@ -55,8 +53,7 @@ public class EntityPlayerMPFake extends ServerPlayer
     public Vec3 spawnPos;
     public double spawnYaw;
 
-    // Returns true if it was successful, false if couldn't spawn due to the player not existing in Mojang servers
-    public static boolean createFake(String username, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
+    public static void createFake(String username, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying, Runnable onError)
     {
         //prolly half of that crap is not necessary, but it works
         ServerLevel worldIn = server.getLevel(dimensionId);
@@ -72,7 +69,7 @@ public class EntityPlayerMPFake extends ServerPlayer
         {
             if (!CarpetSettings.allowSpawningOfflinePlayers)
             {
-                return false;
+                return;
             } else {
                 gameprofile = new GameProfile(UUIDUtil.createOfflinePlayerUUID(username), username);
             }
@@ -86,11 +83,11 @@ public class EntityPlayerMPFake extends ServerPlayer
             }
             EntityPlayerMPFake instance = new EntityPlayerMPFake(server, worldIn, current, ClientInformation.createDefault(), false);
             instance.fixStartingPosition = () -> instance.moveTo(pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
-            server.getPlayerList().placeNewPlayer(new FakeClientConnection(PacketFlow.SERVERBOUND), instance, new CommonListenerCookie(current, 0, instance.clientInformation(), false));
+            server.getPlayerList().placeNewPlayer(new FakeClientConnection(PacketFlow.SERVERBOUND), instance, new CommonListenerCookie(current, 0, instance.clientInformation()));
             instance.teleportTo(worldIn, pos.x, pos.y, pos.z, (float) yaw, (float) pitch);
             instance.setHealth(20.0F);
             instance.unsetRemoved();
-            instance.getAttribute(Attributes.STEP_HEIGHT).setBaseValue(0.6F);
+            instance.setMaxUpStep(0.6F);
             instance.gameMode.changeGameModeForPlayer(gamemode);
             instance.spawnPos = pos;
             instance.spawnYaw = yaw;
@@ -99,8 +96,7 @@ public class EntityPlayerMPFake extends ServerPlayer
             //instance.world.getChunkManager(). updatePosition(instance);
             instance.entityData.set(DATA_PLAYER_MODE_CUSTOMISATION, (byte) 0x7f); // show all model layers (incl. capes)
             instance.getAbilities().flying = flying;
-        }, server);
-        return true;
+        });
     }
 
     private static CompletableFuture<Optional<GameProfile>> fetchGameProfile(final String name) {
@@ -121,8 +117,7 @@ public class EntityPlayerMPFake extends ServerPlayer
         playerShadow.connection.teleport(player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot());
         playerShadow.gameMode.changeGameModeForPlayer(player.gameMode.getGameModeForPlayer());
         ((ServerPlayerInterface) playerShadow).getActionPack().copyFrom(((ServerPlayerInterface) player).getActionPack());
-        // this might create problems if a player logs back in...
-        playerShadow.getAttribute(Attributes.STEP_HEIGHT).setBaseValue(0.6F);
+        playerShadow.setMaxUpStep(0.6F);
         playerShadow.entityData.set(DATA_PLAYER_MODE_CUSTOMISATION, player.getEntityData().get(DATA_PLAYER_MODE_CUSTOMISATION));
 
 
@@ -161,15 +156,12 @@ public class EntityPlayerMPFake extends ServerPlayer
         shakeOff();
 
         if (reason.getContents() instanceof TranslatableContents text && text.getKey().equals("multiplayer.disconnect.duplicate_login")) {
-            this.connection.onDisconnect(new DisconnectionDetails(reason));
+            this.connection.onDisconnect(reason);
+        } else {
+            this.server.tell(new TickTask(this.server.getTickCount(), () -> {
+                this.connection.onDisconnect(reason);
+            }));
         }
-    }
-
-    public void fakePlayerDisconnect(Component reason)
-    {
-        this.server.tell(new TickTask(this.server.getTickCount(), () -> {
-            this.connection.onDisconnect(new DisconnectionDetails(reason));
-        }));
     }
 
     @Override
@@ -244,7 +236,7 @@ public class EntityPlayerMPFake extends ServerPlayer
     }
 
     @Override
-    public Entity changeDimension(DimensionTransition serverLevel)
+    public Entity changeDimension(ServerLevel serverLevel)
     {
         super.changeDimension(serverLevel);
         if (wonGame) {
@@ -268,7 +260,7 @@ public class EntityPlayerMPFake extends ServerPlayer
             // equivalent of Player::blockUsingShield without wonky KB
             if (damageSource.getDirectEntity() instanceof LivingEntity le && le.canDisableShield()) {
                 this.playSound(SoundEvents.SHIELD_BREAK, 0.8F, 0.8F + this.level().random.nextFloat() * 0.4F);
-                this.disableShield();
+                this.disableShield(true);
                 if(!CarpetSettings.ShieldStunning) {
                     this.invulnerableTime = 20;
                 }
