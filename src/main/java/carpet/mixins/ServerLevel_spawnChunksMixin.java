@@ -12,6 +12,6 @@ public class ServerLevel_spawnChunksMixin
     @ModifyConstant(method = "setDefaultSpawnPos", constant = @Constant(intValue = 11), expect = 2)
     private int pushLimit(int original)
     {
-        return CarpetSettings.spawnChunksSize;
+        return 0;
     }
 }

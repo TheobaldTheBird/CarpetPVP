@@ -61,11 +61,4 @@ public abstract class MinecraftServer_coreMixin
 
     @Shadow
     public abstract ServerLevel overworld();
-
-    @Inject(method = "prepareLevels", at = @At("RETURN"))
-    private void afterSpawnCreated(ChunkProgressListener worldGenerationProgressListener, CallbackInfo ci)
-    {
-        if (CarpetSettings.spawnChunksSize != 11)
-            SpawnChunks.changeSpawnSize(overworld(), CarpetSettings.spawnChunksSize);
-    }
 }
