@@ -46,10 +46,14 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("EntityConstructor")
 public class EntityPlayerMPFake extends ServerPlayer
 {
+    private static final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
     private static final Set<String> spawning = new HashSet<>();
 
     public Runnable fixStartingPosition = () -> {};
@@ -218,14 +222,15 @@ public class EntityPlayerMPFake extends ServerPlayer
     }
 
     @Override
-    public void die(DamageSource cause)
-    {
+    public void die(DamageSource cause) {
         shakeOff();
         super.die(cause);
-        setHealth(20);
-        this.foodData = new FoodData();
-        giveExperienceLevels(-(experienceLevel + 1));
         kill(this.getCombatTracker().getDeathMessage());
+        this.executor.schedule(this::respawn, 1L, TimeUnit.MILLISECONDS);
+        this.setHealth(20);
+        this.foodData = new FoodData();
+        this.teleportTo(spawnPos.x, spawnPos.y, spawnPos.z);
+        this.executor.schedule(() -> this.setDeltaMovement(0, 0, 0), 1L, TimeUnit.MILLISECONDS);
     }
 
     @Override
