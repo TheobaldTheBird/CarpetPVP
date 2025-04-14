@@ -71,7 +71,7 @@ public class CarpetServer // static for now - easier to handle all around the co
     // to register before this call in a ModInitializer (declared in fabric.mod.json)
     public static void onGameStarted()
     {
-        settingsManager = new carpet.settings.SettingsManager(CarpetSettings.carpetVersion, "carpet PvP", "Carpet PvP Mod");
+        settingsManager = new carpet.settings.SettingsManager(CarpetSettings.carpetVersion, "carpet", "Carpet PvP");
         settingsManager.parseSettingsClass(CarpetSettings.class);
         extensions.forEach(CarpetExtension::onGameStarted);
         //FabricAPIHooks.initialize();
