@@ -11,7 +11,7 @@ import carpet.script.utils.Tracer;
 import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket;
+import net.minecraft.network.protocol.game.ClientboundSetHeldSlotPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -73,10 +73,9 @@ public class EntityPlayerActionPack
 
     public EntityPlayerActionPack start(ActionType type, Action action)
     {
-        if (action.isContinuous)
-        {
-            Action current = actions.get(type);
-            if (current != null) return this;
+        if(action.isContinuous){
+            Action curent = actions.get(type);
+            if(curent != null) return this;
         }
 
         Action previous = actions.remove(type);
@@ -244,10 +243,8 @@ public class EntityPlayerActionPack
                 }
             }
         }
-
-        float vel = sneaking?0.30F:1.0F;
+        float vel = sneaking?0.3F:1.0F;
         vel *= player.isUsingItem()?0.20F:1.0F;
-
         // The != 0.0F checks are needed given else real players can't control minecarts, however it works with fakes and else they don't stop immediately
         if (forward != 0.0F || player instanceof EntityPlayerMPFake) {
             player.zza = forward * vel;
@@ -264,7 +261,7 @@ public class EntityPlayerActionPack
 
         HitResult hit = Tracer.rayTrace(player, 1, blockReach, false);
 
-        if (hit.getType() == HitResult.Type.BLOCK) return hit;
+        if(hit.getType() == HitResult.Type.BLOCK) return hit;
         return Tracer.rayTrace(player, 1, entityReach, false);
     }
 
@@ -296,7 +293,7 @@ public class EntityPlayerActionPack
     public void setSlot(int slot)
     {
         player.getInventory().selected = slot-1;
-        player.connection.send(new ClientboundSetCarriedItemPacket(slot-1));
+        player.connection.send(new ClientboundSetHeldSlotPacket(slot-1));
     }
 
     public enum ActionType
@@ -328,11 +325,11 @@ public class EntityPlayerActionPack
                             BlockHitResult blockHit = (BlockHitResult) hit;
                             BlockPos pos = blockHit.getBlockPos();
                             Direction side = blockHit.getDirection();
-                            if (pos.getY() < player.level().getMaxBuildHeight() - (side == Direction.UP ? 1 : 0) && world.mayInteract(player, pos))
+                            if (pos.getY() < player.level().getMaxY() - (side == Direction.UP ? 1 : 0) && world.mayInteract(player, pos))
                             {
                                 InteractionResult result = player.gameMode.useItemOn(player, world, player.getItemInHand(hand), hand, blockHit);
                                 player.swing(hand);
-                                if (result.consumesAction())
+                                if (result instanceof InteractionResult.Success success)
                                 {
                                     ap.itemUseCooldown = 3;
                                     return true;
@@ -416,7 +413,7 @@ public class EntityPlayerActionPack
                         boolean blockBroken = false;
                         if (player.gameMode.getGameModeForPlayer().isCreative())
                         {
-                            player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, side, player.level().getMaxBuildHeight(), -1);
+                            player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, side, player.level().getMaxY(), -1);
                             ap.blockHitDelay = 5;
                             blockBroken = true;
                         }
@@ -424,9 +421,9 @@ public class EntityPlayerActionPack
                         {
                             if (ap.currentBlock != null)
                             {
-                                player.gameMode.handleBlockBreakAction(ap.currentBlock, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, side, player.level().getMaxBuildHeight(), -1);
+                                player.gameMode.handleBlockBreakAction(ap.currentBlock, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, side, player.level().getMaxY(), -1);
                             }
-                            player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, side, player.level().getMaxBuildHeight(), -1);
+                            player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK, side, player.level().getMaxY(), -1);
                             boolean notAir = !state.isAir();
                             if (notAir && ap.curBlockDamageMP == 0)
                             {
@@ -449,7 +446,7 @@ public class EntityPlayerActionPack
                             ap.curBlockDamageMP += state.getDestroyProgress(player, player.level(), pos);
                             if (ap.curBlockDamageMP >= 1)
                             {
-                                player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, side, player.level().getMaxBuildHeight(), -1);
+                                player.gameMode.handleBlockBreakAction(pos, ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK, side, player.level().getMaxY(), -1);
                                 ap.currentBlock = null;
                                 ap.blockHitDelay = 5;
                                 blockBroken = true;
@@ -462,7 +459,7 @@ public class EntityPlayerActionPack
                         return blockBroken;
                     }
                 }
-                if (!action.isContinuous) player.swing(InteractionHand.MAIN_HAND);
+                if(!action.isContinuous) player.swing(InteractionHand.MAIN_HAND);
                 player.resetAttackStrengthTicker();
                 player.resetLastActionTime();
                 return false;
@@ -474,7 +471,7 @@ public class EntityPlayerActionPack
                 EntityPlayerActionPack ap = ((ServerPlayerInterface) player).getActionPack();
                 if (ap.currentBlock == null) return;
                 player.level().destroyBlockProgress(-1, ap.currentBlock, -1);
-                player.gameMode.handleBlockBreakAction(ap.currentBlock, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.DOWN, player.level().getMaxBuildHeight(), -1);
+                player.gameMode.handleBlockBreakAction(ap.currentBlock, ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK, Direction.DOWN, player.level().getMaxY(), -1);
                 ap.currentBlock = null;
             }
         },
