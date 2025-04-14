@@ -226,16 +226,14 @@ public class PlayerCommand
         return false;
     }
 
-    private static int kill(CommandContext<CommandSourceStack> context)
-    {
+    private static int kill(CommandContext<CommandSourceStack> context) {
         if (cantReMove(context)) return 0;
         ServerPlayer player = getPlayer(context);
         player.kill(player.serverLevel());
         return 1;
     }
 
-    private static int disconnect(CommandContext<CommandSourceStack> context)
-    {
+    private static int disconnect(CommandContext<CommandSourceStack> context) {
         Player player = getPlayer(context);
         if (player instanceof EntityPlayerMPFake)
         {
