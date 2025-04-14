@@ -269,15 +269,16 @@ public class EntityPlayerMPFake extends ServerPlayer
             if(source.getEntity() instanceof LivingEntity le && le.canDisableShield()){
                 this.playSound(SoundEvents.SHIELD_BREAK, 0.8F, 0.8F + this.level().random.nextFloat() * 0.4F);
                 this.disableShield(stack);
-
+                if(!CarpetSettings.shieldStunning) {
+                    this.invulnerableTime = 20;
+                }
                 String ign = this.getGameProfile().getName();
                 CommandSourceStack commandSource = server.createCommandSourceStack().withSuppressedOutput();
                 ParseResults<CommandSourceStack> parseResults
                         = server.getCommands().getDispatcher().parse(String.format("function practicebot:shielddisable", ign), commandSource);
                 server.getCommands().performCommand(parseResults, "");
             } else {
-                this.playSound(SoundEvents.SHIELD_BREAK, 1.0F, 0.8F
-                        + this.level().random.nextFloat() * 0.4F);
+                this.playSound(SoundEvents.SHIELD_BLOCK, 1.0F, 0.8F + this.level().random.nextFloat() * 0.4F);
             }
             CriteriaTriggers.ENTITY_HURT_PLAYER.trigger((ServerPlayer)this, source, f, 0, true);
             if(f < 3.4028235E37F){
