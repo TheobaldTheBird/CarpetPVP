@@ -187,10 +187,6 @@ public class EntityPlayerMPFake extends ServerPlayer
 
         if (reason.getContents() instanceof TranslatableContents text && text.getKey().equals("multiplayer.disconnect.duplicate_login")) {
             this.connection.onDisconnect(new DisconnectionDetails(reason));
-        } else {
-            this.server.schedule(new TickTask(this.server.getTickCount(), () -> {
-                this.connection.onDisconnect(new DisconnectionDetails(reason));
-            }));
         }
     }
 
