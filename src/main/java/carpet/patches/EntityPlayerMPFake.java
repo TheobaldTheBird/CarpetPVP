@@ -176,13 +176,11 @@ public class EntityPlayerMPFake extends ServerPlayer
     }
 
     @Override
-    public void kill(ServerLevel level)
-    {
+    public void kill(ServerLevel level) {
         kill(Messenger.s("Killed"));
     }
 
-    public void kill(Component reason)
-    {
+    public void kill(Component reason) {
         shakeOff();
 
         if (reason.getContents() instanceof TranslatableContents text && text.getKey().equals("multiplayer.disconnect.duplicate_login")) {
@@ -190,9 +188,15 @@ public class EntityPlayerMPFake extends ServerPlayer
         }
     }
 
+    public void fakePlayerDisconnect(Component reason) {
+        this.server.schedule(new TickTask(this.server.getTickCount(), () -> {
+            this.connection.onDisconnect(new DisconnectionDetails(reason));
+        }));
+
+    }
+
     @Override
-    public void tick()
-    {
+    public void tick() {
         if (this.getServer().getTickCount() % 10 == 0)
         {
             this.connection.resetPosition();
