@@ -237,7 +237,7 @@ public class PlayerCommand
         Player player = getPlayer(context);
         if (player instanceof EntityPlayerMPFake)
         {
-            //((EntityPlayerMPFake) player).fakePlayerDisconnect(Messenger.s(""));
+            ((EntityPlayerMPFake) player).fakePlayerDisconnect(Messenger.s(""));
             return 1;
         }
         Messenger.m(context.getSource(), "r Cannot disconnect real players");
