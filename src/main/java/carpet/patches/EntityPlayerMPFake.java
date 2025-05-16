@@ -178,6 +178,8 @@ public class EntityPlayerMPFake extends ServerPlayer
     @Override
     public void kill(ServerLevel level) {
         kill(Messenger.s("Killed"));
+        DamageSource dmgSource = level.damageSources().fellOutOfWorld();
+        die(dmgSource);
     }
 
     public void kill(Component reason) {
