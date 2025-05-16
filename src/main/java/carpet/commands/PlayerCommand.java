@@ -138,7 +138,8 @@ public class PlayerCommand
 
     private static Collection<String> getPlayerSuggestions(CommandSourceStack source)
     {
-        Set<String> players = new LinkedHashSet<>(List.of("Steve", "Alex", "TheobaldTheBot"));
+        //using s instead of @s because making it parse selectors properly was a pain in the ass
+        Set<String> players = new LinkedHashSet<>(List.of("Steve", "Alex", "TheobaldTheBot", "s"));
         players.addAll(source.getOnlinePlayerNames());
         return players;
     }
@@ -146,7 +147,12 @@ public class PlayerCommand
     private static ServerPlayer getPlayer(CommandContext<CommandSourceStack> context)
     {
         String playerName = StringArgumentType.getString(context, "player");
-        MinecraftServer server = context.getSource().getServer();
+        CommandSourceStack source = context.getSource();
+        MinecraftServer server = source.getServer();
+
+        //we can just use '/execute as' when we want proper target selectors
+        if (playerName.equals("s") && source.isPlayer()) return source.getPlayer();
+
         return server.getPlayerList().getPlayerByName(playerName);
     }
 
