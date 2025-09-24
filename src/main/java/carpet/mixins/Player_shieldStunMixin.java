@@ -1,10 +1,13 @@
 package carpet.mixins;
 
 import carpet.CarpetSettings;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlocksAttacks;
 import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -26,7 +29,17 @@ public abstract class Player_shieldStunMixin extends LivingEntity {
 
     @Inject(method = "blockUsingItem", at = @At("HEAD"))
     private void onShieldDisabled(ServerLevel serverLevel, LivingEntity livingEntity, CallbackInfo ci) {
-        if (CarpetSettings.shieldStunning) {
+        var canDisableShield = false;
+        // same code as from blockUsingItem in LivingEntity where it checks if you can disable shield
+        ItemStack itemStack = this.getItemBlockingWith();
+        BlocksAttacks blocksAttacks = itemStack != null ? (BlocksAttacks)itemStack.get(DataComponents.BLOCKS_ATTACKS) : null;
+        float f = livingEntity.getSecondsToDisableBlocking();
+        if (f > 0.0F && blocksAttacks != null) {
+            canDisableShield = true;
+        }
+
+        if (canDisableShield && CarpetSettings.shieldStunning) {
+            this.invulnerableTime = 20;
             executor.schedule(() -> {
                 this.invulnerableTime = 0;
             }, 1, TimeUnit.MILLISECONDS);

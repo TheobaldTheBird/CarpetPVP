@@ -2,11 +2,11 @@ package carpet.patches;
 
 import carpet.CarpetSettings;
 import com.mojang.authlib.GameProfile;
-import com.mojang.brigadier.ParseResults;
+import it.unimi.dsi.fastutil.doubles.DoubleDoubleImmutablePair;
 import net.minecraft.advancements.CriteriaTriggers;
-import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -14,7 +14,6 @@ import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.network.protocol.game.ClientboundRotateHeadPacket;
-import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket;
 import net.minecraft.network.protocol.game.ServerboundClientCommandPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
@@ -24,16 +23,21 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.players.GameProfileCache;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.stats.Stats;
+import net.minecraft.tags.DamageTypeTags;
+import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.food.FoodData;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.BlocksAttacks;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.SkullBlockEntity;
@@ -42,8 +46,9 @@ import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.phys.Vec3;
 import carpet.fakes.ServerPlayerInterface;
 import carpet.utils.Messenger;
-import carpet.helpers.EntityPlayerActionPack;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -288,31 +293,203 @@ public class EntityPlayerMPFake extends ServerPlayer
         return connection.player;
     }
 
-    @Override
-    public boolean hurtServer(ServerLevel serverLevel, DamageSource source, float f) {
-        if(f > 0.0f && this.(source);){
-            this.applyItemBlocking(serverLevel, source, f);
-            ItemStack stack = this.getUseItem();
-            if(source.getEntity() instanceof LivingEntity le && le.canDisableShield()){
-                this.playSound(SoundEvents.SHIELD_BREAK, 0.8F, 0.8F + this.level().random.nextFloat() * 0.4F);
-                this.block(stack);
-                if(!CarpetSettings.shieldStunning) {
-                    this.invulnerableTime = 20;
-                }
-                String ign = this.getGameProfile().getName();
-                CommandSourceStack commandSource = server.createCommandSourceStack().withSuppressedOutput();
-                ParseResults<CommandSourceStack> parseResults
-                        = server.getCommands().getDispatcher().parse(String.format("function practicebot:shielddisable", ign), commandSource);
-                server.getCommands().performCommand(parseResults, "");
-            } else {
-                this.playSound(SoundEvents.SHIELD_BLOCK, 1.0F, 0.8F + this.level().random.nextFloat() * 0.4F);
-            }
-            CriteriaTriggers.ENTITY_HURT_PLAYER.trigger((ServerPlayer)this, source, f, 0, true);
-            if(f < 3.4028235E37F){
-                ((ServerPlayer)this).awardStat(Stats.DAMAGE_BLOCKED_BY_SHIELD, Math.round(f * 10.0F));
-            }
-            return false;
+
+
+    // i'm sure there's a better way to do this but I do not like writing Java code and this Just Works
+    // all this crap is just to get the private methods and fields that are used in the code I copy-pasted from LivingEntity.... very cool
+    private boolean helper1(Method method, Object... args) {
+        try {
+            return (boolean)method.invoke(this, args);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
-        return super.hurtServer(serverLevel, source, f);
+    }
+    private void helper2(Method method, Object... args) {
+        try {
+            method.invoke(this, args);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+    private <T> void helper3(Field field, T value) {
+        try {
+            field.set(this, value);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    static Method checkTotemDeathProtection;
+    static Method playSecondaryHurtSound;
+    static Field lastDamageSource;
+    static Field lastDamageStamp;
+
+
+    static {
+        try {
+            checkTotemDeathProtection = LivingEntity.class.getDeclaredMethod("checkTotemDeathProtection", DamageSource.class);
+            checkTotemDeathProtection.setAccessible(true);
+            playSecondaryHurtSound = LivingEntity.class.getDeclaredMethod("playSecondaryHurtSound", DamageSource.class);
+            playSecondaryHurtSound.setAccessible(true);
+            lastDamageSource = LivingEntity.class.getDeclaredField("lastDamageSource");
+            lastDamageSource.setAccessible(true);
+            lastDamageStamp = LivingEntity.class.getDeclaredField("lastDamageStamp");
+            lastDamageStamp.setAccessible(true);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    @Override
+    public boolean hurtServer(ServerLevel serverLevel, DamageSource damageSource, float f) {
+        // copy-pasted from LivingEntity with small changes
+        if (this.isInvulnerableTo(serverLevel, damageSource)) {
+            return false;
+        } else if (this.isDeadOrDying()) {
+            return false;
+        } else if (damageSource.is(DamageTypeTags.IS_FIRE) && this.hasEffect(MobEffects.FIRE_RESISTANCE)) {
+            return false;
+        } else {
+            if (this.isSleeping()) {
+                this.stopSleeping();
+            }
+
+            this.noActionTime = 0;
+            if (f < 0.0F) {
+                f = 0.0F;
+            }
+
+            float g = f;
+            float h = this.applyItemBlocking(serverLevel, damageSource, f);
+            f -= h;
+            boolean bl = h > 0.0F;
+            if (damageSource.is(DamageTypeTags.IS_FREEZING) && this.getType().is(EntityTypeTags.FREEZE_HURTS_EXTRA_TYPES)) {
+                f *= 5.0F;
+            }
+
+            if (damageSource.is(DamageTypeTags.DAMAGES_HELMET) && !this.getItemBySlot(EquipmentSlot.HEAD).isEmpty()) {
+                this.hurtHelmet(damageSource, f);
+                f *= 0.75F;
+            }
+
+            if (Float.isNaN(f) || Float.isInfinite(f)) {
+                f = Float.MAX_VALUE;
+            }
+
+            boolean bl2 = true;
+            if ((float)this.invulnerableTime > 10.0F && !damageSource.is(DamageTypeTags.BYPASSES_COOLDOWN)) {
+                if (f <= this.lastHurt) {
+                    return false;
+                }
+
+                this.actuallyHurt(serverLevel, damageSource, f - this.lastHurt);
+                this.lastHurt = f;
+                bl2 = false;
+            } else {
+                this.lastHurt = f;
+                this.invulnerableTime = 20;
+                this.actuallyHurt(serverLevel, damageSource, f);
+                this.hurtDuration = 10;
+                this.hurtTime = this.hurtDuration;
+            }
+
+            this.resolveMobResponsibleForDamage(damageSource);
+            this.resolvePlayerResponsibleForDamage(damageSource);
+            if (bl2) {
+                BlocksAttacks blocksAttacks = (BlocksAttacks)this.getUseItem().get(DataComponents.BLOCKS_ATTACKS);
+                if (bl && blocksAttacks != null) {
+                    blocksAttacks.onBlocked(serverLevel, this);
+                } else {
+                    serverLevel.broadcastDamageEvent(this, damageSource);
+                }
+
+                if (!damageSource.is(DamageTypeTags.NO_IMPACT) && (!bl || f > 0.0F)) {
+                    this.markHurt();
+                }
+
+                if (!damageSource.is(DamageTypeTags.NO_KNOCKBACK)) {
+                    double d = (double)0.0F;
+                    double e = (double)0.0F;
+                    Entity var14 = damageSource.getDirectEntity();
+                    if (var14 instanceof Projectile) {
+                        Projectile projectile = (Projectile)var14;
+                        DoubleDoubleImmutablePair doubleDoubleImmutablePair = projectile.calculateHorizontalHurtKnockbackDirection(this, damageSource);
+                        d = -doubleDoubleImmutablePair.leftDouble();
+                        e = -doubleDoubleImmutablePair.rightDouble();
+                    } else if (damageSource.getSourcePosition() != null) {
+                        d = damageSource.getSourcePosition().x() - this.getX();
+                        e = damageSource.getSourcePosition().z() - this.getZ();
+                    }
+
+                    // moved this.knockback into the if block instead of before it
+                    if (!bl) {
+                        this.knockback((double)0.4F, d, e);
+                        this.indicateDamage(d, e);
+                    }
+                }
+            }
+
+            if (this.isDeadOrDying()) {
+                if (!helper1(checkTotemDeathProtection, damageSource)) {
+                    if (bl2) {
+                        this.makeSound(this.getDeathSound());
+                        helper2(playSecondaryHurtSound,damageSource);
+                    }
+
+                    this.die(damageSource);
+                }
+            } else if (bl2 && (!CarpetSettings.shieldStunning || !bl)) { // changed here
+                this.playHurtSound(damageSource);
+                helper2(playSecondaryHurtSound,damageSource);
+            }
+
+            boolean bl3 = !bl || f > 0.0F;
+            if (bl3) {
+                helper3(lastDamageSource, damageSource);
+                helper3(lastDamageStamp, this.level().getGameTime());
+
+                for(MobEffectInstance mobEffectInstance : this.getActiveEffects()) {
+                    mobEffectInstance.onMobHurt(serverLevel, this, damageSource, f);
+                }
+            }
+
+            if (this instanceof ServerPlayer) {
+                ServerPlayer serverPlayer = (ServerPlayer)this;
+                CriteriaTriggers.ENTITY_HURT_PLAYER.trigger(serverPlayer, damageSource, g, f, bl);
+                if (h > 0.0F && h < 3.4028235E37F) {
+                    serverPlayer.awardStat(Stats.DAMAGE_BLOCKED_BY_SHIELD, Math.round(h * 10.0F));
+                }
+            }
+
+            Entity var20 = damageSource.getEntity();
+            if (var20 instanceof ServerPlayer) {
+                ServerPlayer serverPlayer = (ServerPlayer)var20;
+                CriteriaTriggers.PLAYER_HURT_ENTITY.trigger(serverPlayer, this, damageSource, g, f, bl);
+            }
+
+            return bl3;
+        }
+    }
+
+
+    @Override
+    protected void blockUsingItem(ServerLevel serverLevel, LivingEntity livingEntity) {
+        // copy-pasted from LivingEntity with small changes
+
+        // this would apply wrong knockback
+//        super.blockUsingItem(serverLevel, livingEntity);
+        ItemStack itemStack = this.getItemBlockingWith();
+        BlocksAttacks blocksAttacks = itemStack != null ? (BlocksAttacks)itemStack.get(DataComponents.BLOCKS_ATTACKS) : null;
+        float f = livingEntity.getSecondsToDisableBlocking();
+        if (f > 0.0F && blocksAttacks != null) {
+            blocksAttacks.disable(serverLevel, this, f, itemStack);
+            this.invulnerableTime = 20;
+            if (CarpetSettings.shieldStunning) { // correct behavior for shield stunning
+                executor.schedule(() -> {
+                    this.invulnerableTime = 0;
+                }, 1, TimeUnit.MILLISECONDS);
+            }
+        }
+
     }
 }
