@@ -1,9 +1,12 @@
 package carpet.patches;
 
 import carpet.CarpetSettings;
+import carpet.mixins.LivingEntityAccessor;
 import com.mojang.authlib.GameProfile;
 import it.unimi.dsi.fastutil.doubles.DoubleDoubleImmutablePair;
 import net.minecraft.advancements.CriteriaTriggers;
+import net.minecraft.client.telemetry.TelemetryProperty;
+import net.minecraft.commands.arguments.GameModeArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.component.DataComponents;
@@ -21,12 +24,14 @@ import net.minecraft.server.TickTask;
 import net.minecraft.server.level.ClientInformation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerPlayerGameMode;
 import net.minecraft.server.network.CommonListenerCookie;
 import net.minecraft.server.players.GameProfileCache;
 import net.minecraft.stats.Stats;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -47,6 +52,7 @@ import net.minecraft.world.phys.Vec3;
 import carpet.fakes.ServerPlayerInterface;
 import carpet.utils.Messenger;
 
+import java.io.Console;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashSet;
@@ -293,56 +299,17 @@ public class EntityPlayerMPFake extends ServerPlayer
         return connection.player;
     }
 
-
-
-    // i'm sure there's a better way to do this but I do not like writing Java code and this Just Works
-    // all this crap is just to get the private methods and fields that are used in the code I copy-pasted from LivingEntity.... very cool
-    private boolean helper1(Method method, Object... args) {
-        try {
-            return (boolean)method.invoke(this, args);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-    private void helper2(Method method, Object... args) {
-        try {
-            method.invoke(this, args);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-    private <T> void helper3(Field field, T value) {
-        try {
-            field.set(this, value);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    static Method checkTotemDeathProtection;
-    static Method playSecondaryHurtSound;
-    static Field lastDamageSource;
-    static Field lastDamageStamp;
-
-
-    static {
-        try {
-            checkTotemDeathProtection = LivingEntity.class.getDeclaredMethod("checkTotemDeathProtection", DamageSource.class);
-            checkTotemDeathProtection.setAccessible(true);
-            playSecondaryHurtSound = LivingEntity.class.getDeclaredMethod("playSecondaryHurtSound", DamageSource.class);
-            playSecondaryHurtSound.setAccessible(true);
-            lastDamageSource = LivingEntity.class.getDeclaredField("lastDamageSource");
-            lastDamageSource.setAccessible(true);
-            lastDamageStamp = LivingEntity.class.getDeclaredField("lastDamageStamp");
-            lastDamageStamp.setAccessible(true);
-        } catch (Exception ex) {
-            throw new RuntimeException(ex);
-        }
+    @Override
+    public boolean isInvulnerableTo(ServerLevel serverLevel, DamageSource damageSource) {
+        return super.isInvulnerableTo(serverLevel, damageSource) || this.isChangingDimension() && !damageSource.is(DamageTypes.ENDER_PEARL) || !this.hasClientLoaded();
     }
 
     @Override
     public boolean hurtServer(ServerLevel serverLevel, DamageSource damageSource, float f) {
         // copy-pasted from LivingEntity with small changes
+        if (this.gameMode.getGameModeForPlayer() == GameType.CREATIVE || this.gameMode.getGameModeForPlayer() == GameType.SPECTATOR) {
+            return false;
+        }
         if (this.isInvulnerableTo(serverLevel, damageSource)) {
             return false;
         } else if (this.isDeadOrDying()) {
@@ -408,8 +375,8 @@ public class EntityPlayerMPFake extends ServerPlayer
                 }
 
                 if (!damageSource.is(DamageTypeTags.NO_KNOCKBACK)) {
-                    double d = (double)0.0F;
-                    double e = (double)0.0F;
+                    double d = 0.0d;
+                    double e = 0.0d;
                     Entity var14 = damageSource.getDirectEntity();
                     if (var14 instanceof Projectile) {
                         Projectile projectile = (Projectile)var14;
@@ -423,30 +390,35 @@ public class EntityPlayerMPFake extends ServerPlayer
 
                     // moved this.knockback into the if block instead of before it
                     if (!bl) {
-                        this.knockback((double)0.4F, d, e);
+                        this.knockback(0.4d, d, e);
                         this.indicateDamage(d, e);
                     }
                 }
             }
 
             if (this.isDeadOrDying()) {
-                if (!helper1(checkTotemDeathProtection, damageSource)) {
-                    if (bl2) {
-                        this.makeSound(this.getDeathSound());
-                        helper2(playSecondaryHurtSound,damageSource);
-                    }
+                try {
+                    if (!((LivingEntityAccessor) this).invokeCheckTotemDeathProtection(damageSource)) {
+                        if (bl2) {
+                            this.makeSound(this.getDeathSound());
+                            ((LivingEntityAccessor) this).invokePlaySecondaryHurtSound(damageSource);
+                        }
 
-                    this.die(damageSource);
+                        this.die(damageSource);
+                    }
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
+
             } else if (bl2 && (!CarpetSettings.shieldStunning || !bl)) { // changed here
                 this.playHurtSound(damageSource);
-                helper2(playSecondaryHurtSound,damageSource);
+                ((LivingEntityAccessor) this).invokePlaySecondaryHurtSound(damageSource);
             }
 
             boolean bl3 = !bl || f > 0.0F;
             if (bl3) {
-                helper3(lastDamageSource, damageSource);
-                helper3(lastDamageStamp, this.level().getGameTime());
+                ((LivingEntityAccessor) this).setLastDamageSource(damageSource);
+                ((LivingEntityAccessor) this).setLastDamageStamp(this.level().getGameTime());
 
                 for(MobEffectInstance mobEffectInstance : this.getActiveEffects()) {
                     mobEffectInstance.onMobHurt(serverLevel, this, damageSource, f);
