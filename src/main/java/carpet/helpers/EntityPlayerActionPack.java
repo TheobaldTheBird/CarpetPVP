@@ -50,6 +50,9 @@ public class EntityPlayerActionPack
 
     private int itemUseCooldown;
 
+    private double fakeFallDistance;
+    private double lastY;
+
     public EntityPlayerActionPack(ServerPlayer playerIn)
     {
         player = playerIn;
@@ -216,7 +219,27 @@ public class EntityPlayerActionPack
     }
 
     public void onUpdate()
-    {
+    {        
+        double y = player.getY();
+        double dy = y - lastY;
+
+        if (player.onGround()
+                || dy > 0
+                || player.isInWater()
+                || player.onClimbable()
+                || player.isPassenger()
+                || player.isFallFlying())
+        {
+            fakeFallDistance = 0;
+        }
+        else if (dy < 0)
+        {
+            fakeFallDistance += -dy;
+        }
+
+        lastY = y;
+        player.fallDistance = fakeFallDistance;
+
         Map<ActionType, Boolean> actionAttempts = new HashMap<>();
         actions.values().removeIf(e -> e.done);
         for (Map.Entry<ActionType, Action> e : actions.entrySet())
@@ -386,6 +409,9 @@ public class EntityPlayerActionPack
                         EntityHitResult entityHit = (EntityHitResult) hit;
                         if (!action.isContinuous)
                         {
+                            player.fallDistance = (float)((ServerPlayerInterface)player)
+                                    .getActionPack()
+                                    .fakeFallDistance;
                             player.attack(entityHit.getEntity());
                             player.swing(InteractionHand.MAIN_HAND);
                         }
@@ -483,9 +509,11 @@ public class EntityPlayerActionPack
                 if (action.limit == 1)
                 {
                     if (player.onGround()) player.jumpFromGround(); // onGround
+                    if (!player.onGround()) player.tryToStartFallFlying(); // might not be necessary for the !onGround thing but just in case (cause I didn't see it as a part of the method)
                 }
                 else
                 {
+                    if (!player.onGround()) player.tryToStartFallFlying(); // might not be necessary for the !onGround thing but just in case (cause I didn't see it as a part of the method)
                     player.setJumping(true);
                 }
                 return false;
