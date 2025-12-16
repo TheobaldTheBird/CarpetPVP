@@ -310,6 +310,9 @@ public class EntityPlayerMPFake extends ServerPlayer
         if (this.gameMode.getGameModeForPlayer() == GameType.CREATIVE || this.gameMode.getGameModeForPlayer() == GameType.SPECTATOR) {
             return false;
         }
+        if (damageSource.getDirectEntity() instanceof ThrowableItemProjectile) {
+                return false;
+        }
         if (this.isInvulnerableTo(serverLevel, damageSource)) {
             return false;
         } else if (this.isDeadOrDying()) {
