@@ -48,6 +48,7 @@
     "DynamicGraphMinFixedPoint_resetChunkInterface",
     "EndCrystal_scarpetEventsMixin",
     "Entity_scarpetEventsMixin",
+    "EntityDataAccessorMixin",
     "EntityMixin",
     "ExperienceOrb_xpNoCooldownMixin",
     "FallingBlockEntity_scarpetEventsMixin",
