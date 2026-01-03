@@ -39,7 +39,10 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.entity.projectile.ThrowableItemProjectile;
+import net.minecraft.world.entity.projectile.ThrownEnderpearl;
 import net.minecraft.world.food.FoodData;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.BlocksAttacks;
@@ -73,6 +76,7 @@ public class EntityPlayerMPFake extends ServerPlayer
     public boolean isAShadow;
     public Vec3 spawnPos;
     public double spawnYaw;
+    public double fakeFallDistance;
 
     // Returns true if it was successful, false if couldn't spawn due to the player not existing in Mojang servers
     public static boolean createFake(String username, MinecraftServer server, Vec3 pos, double yaw, double pitch, ResourceKey<Level> dimensionId, GameType gamemode, boolean flying)
@@ -131,7 +135,17 @@ public class EntityPlayerMPFake extends ServerPlayer
             server.getPlayerList().broadcastAll(ClientboundEntityPositionSyncPacket.of(instance), dimensionId);//instance.dimension);
             //instance.world.getChunkManager(). updatePosition(instance);
             instance.entityData.set(DATA_PLAYER_MODE_CUSTOMISATION, (byte) 0x7f); // show all model layers (incl. capes)
-            instance.getAbilities().flying = flying;
+            instance.getAbilities().mayfly =
+                    gamemode.isCreative() || gamemode == GameType.SPECTATOR;
+            instance.getAbilities().flying =
+                    gamemode.isCreative() || gamemode == GameType.SPECTATOR;
+
+            instance.onUpdateAbilities();
+
+            server.execute(() -> { //so it delays by a little
+                instance.setOnGround(false);
+                instance.setDeltaMovement(0.0D, instance.getDeltaMovement().y, 0.0D);
+            });
         }, server);
         return true;
     }
@@ -311,7 +325,7 @@ public class EntityPlayerMPFake extends ServerPlayer
             return false;
         }
         if (damageSource.getDirectEntity() instanceof ThrowableItemProjectile) {
-                return false;
+            return false;
         }
         if (this.isInvulnerableTo(serverLevel, damageSource)) {
             return false;
