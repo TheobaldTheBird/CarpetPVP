@@ -143,6 +143,7 @@
     "ServerLevel_scarpetMixin",
     "ServerLevel_tickMixin",
     "ServerPlayer_actionPackMixin",
+    "ServerPlayer_fixPassengersMixin",
     "ServerPlayer_scarpetEventMixin",
     "ServerPlayerGameMode_antiCheatMixin",
     "ServerPlayerGameMode_cactusMixin",
