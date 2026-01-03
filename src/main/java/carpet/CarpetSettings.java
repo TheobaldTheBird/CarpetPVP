@@ -1040,4 +1040,10 @@ public class CarpetSettings
             category = {SURVIVAL, FEATURE}
     )
     public static boolean shieldStunning = false;
+    
+    @Rule(
+            desc = "Enables editing player nbt, so you can directly edit values within a player's data.",
+            category = {COMMAND, EXPERIMENTAL}
+    )
+    public static boolean editablePlayerNbt = false;
 }
