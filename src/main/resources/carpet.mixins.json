@@ -128,6 +128,7 @@
     "RandomState_ScarpetMixin",
     "RedstoneWireBlock_fastMixin",
     "ReloadCommand_reloadAppsMixin",
+    "RideCommandMixin",
     "SaplingBlock_desertShrubsMixin",
     "Scoreboard_scarpetMixin",
     "SculkSensorBlockEntityVibrationConfig_sculkSensorRangeMixin",
