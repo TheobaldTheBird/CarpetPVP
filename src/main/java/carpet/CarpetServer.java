@@ -129,6 +129,7 @@ public class CarpetServer // static for now - easier to handle all around the co
         LogCommand.register(dispatcher, commandBuildContext);
         SpawnCommand.register(dispatcher, commandBuildContext);
         PlayerCommand.register(dispatcher, commandBuildContext);
+        PlayerSpawnCommand.register(dispatcher, commandBuildContext);
         InfoCommand.register(dispatcher, commandBuildContext);
         DistanceCommand.register(dispatcher, commandBuildContext);
         PerimeterInfoCommand.register(dispatcher, commandBuildContext);
