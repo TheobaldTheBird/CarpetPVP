@@ -35,25 +35,32 @@ public class DistanceCalculator
                 Messenger.tp("c", pos2),
                 "w :"
         ));
-        res.add(Messenger.c("w  - Spherical: ", String.format("wb %.2f", spherical)));
         res.add(Messenger.c("w  - Cylindrical: ", String.format("wb %.2f", cylindrical)));
         res.add(Messenger.c("w  - Manhattan: ", String.format("wb %.1f", manhattan)));
+        res.add(Messenger.c("w  - Spherical: ", String.format("wb %.2f", spherical)));
         return res;
     }
 
-    private static int sphericalDistance(Vec3 pos1, Vec3 pos2)
+    private static double sphericalDistanceDouble(Vec3 pos1, Vec3 pos2)
     {
         double dx = pos1.x - pos2.x;
         double dy = pos1.y - pos2.y;
         double dz = pos1.z - pos2.z;
-        return (int)Math.round(Math.sqrt(dx * dx + dy * dy + dz * dz));
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    public static int distance(CommandSourceStack source, Vec3 pos1, Vec3 pos2, int exponent)
+    {
+        double dist = sphericalDistanceDouble(pos1, pos2);
+        int scale = exponent <= 0 ? 1 : (int)Math.pow(10, exponent);
+        int result = (int)Math.round(dist * scale);
+        Messenger.send(source, findDistanceBetweenTwoPoints(pos1, pos2));
+        return result;
     }
 
     public static int distance(CommandSourceStack source, Vec3 pos1, Vec3 pos2)
     {
-        int spherical = sphericalDistance(pos1, pos2);
-        Messenger.send(source, findDistanceBetweenTwoPoints(pos1, pos2));
-        return spherical;
+        return distance(source, pos1, pos2, 0);
     }
 
     public static int setStart(CommandSourceStack source, Vec3 pos)
@@ -63,7 +70,7 @@ public class DistanceCalculator
         return 1;
     }
 
-    public static int setEnd(CommandSourceStack source, Vec3 pos)
+    public static int setEnd(CommandSourceStack source, Vec3 pos, int exponent)
     {
         if (!hasStartingPoint(source))
         {
@@ -74,8 +81,15 @@ public class DistanceCalculator
         }
 
         Vec3 start = START_POINT_STORAGE.get(source.getTextName());
-        int spherical = sphericalDistance(start, pos);
+        double dist = sphericalDistanceDouble(start, pos);
+        int scale = exponent <= 0 ? 1 : (int)Math.pow(10, exponent);
+        int result = (int)Math.round(dist * scale);
         Messenger.send(source, findDistanceBetweenTwoPoints(start, pos));
-        return spherical;
+        return result;
+    }
+
+    public static int setEnd(CommandSourceStack source, Vec3 pos)
+    {
+        return setEnd(source, pos, 0);
     }
 }
