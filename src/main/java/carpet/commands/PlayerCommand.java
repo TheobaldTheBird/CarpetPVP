@@ -23,7 +23,6 @@ import net.minecraft.commands.arguments.coordinates.Vec3Argument;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,48 +43,155 @@ public class PlayerCommand
                 literal("player")
                         .requires(src -> CommandHelper.canUseCommand(src, CarpetSettings.commandPlayer))
                         .then(argument("targets", EntityArgument.players())
-                                .then(literal("stop").executes(manipulation(EntityPlayerActionPack::stopAll)))
-                                .then(makeActionCommand("use", ActionType.USE))
+
+                                .then(literal("stop")
+                                        .executes(manipulation(EntityPlayerActionPack::stopAll)))
+
+                                .then(literal("use")
+                                        .executes(manipulation(EntityPlayerActionPack::stopUse))
+                                        .then(literal("once")
+                                                .executes(manipulation(ap -> ap.start(ActionType.USE, Action.once()))))
+                                        .then(literal("continuous")
+                                                .executes(manipulation(ap -> ap.start(ActionType.USE, Action.continuous()))))
+                                        .then(literal("interval")
+                                                .then(argument("ticks", IntegerArgumentType.integer(1))
+                                                        .executes(c -> manipulate(c,
+                                                                ap -> ap.start(
+                                                                        ActionType.USE,
+                                                                        Action.interval(IntegerArgumentType.getInteger(c, "ticks"))
+                                                                ))))))
+
                                 .then(makeActionCommand("jump", ActionType.JUMP))
                                 .then(makeActionCommand("attack", ActionType.ATTACK))
                                 .then(makeActionCommand("drop", ActionType.DROP_ITEM))
                                 .then(makeActionCommand("dropStack", ActionType.DROP_STACK))
                                 .then(makeActionCommand("swapHands", ActionType.SWAP_HANDS))
-                                .then(
-                                        makeSwingCommand())
+
+                                .then(literal("swing")
+                                        .executes(manipulation(EntityPlayerActionPack::stopSwing))
+                                        .then(literal("once")
+                                                .executes(manipulation(ap -> ap.start(ActionType.SWING, Action.once()))))
+                                        .then(literal("continuous")
+                                                .executes(manipulation(ap -> ap.start(ActionType.SWING, Action.continuous()))))
+                                        .then(literal("interval")
+                                                .then(argument("ticks", IntegerArgumentType.integer(1))
+                                                        .executes(c -> manipulate(c,
+                                                                ap -> ap.start(
+                                                                        ActionType.SWING,
+                                                                        Action.interval(IntegerArgumentType.getInteger(c, "ticks"))
+                                                                ))))))
+
                                 .then(literal("hotbar")
                                         .then(argument("slot", IntegerArgumentType.integer(1, 9))
                                                 .executes(c -> manipulate(c,
                                                         ap -> ap.setSlot(IntegerArgumentType.getInteger(c, "slot"))))))
-                                .then(literal("kill").executes(PlayerCommand::kill))
-                                .then(literal("disconnect").executes(PlayerCommand::disconnect))
-                                .then(literal("shadow").executes(PlayerCommand::shadow))
+
+                                .then(literal("kill")
+                                        .executes(PlayerCommand::kill))
+
+                                .then(literal("disconnect")
+                                        .executes(PlayerCommand::disconnect))
+
+                                .then(literal("shadow")
+                                        .executes(PlayerCommand::shadow))
+
                                 .then(literal("mount")
                                         .executes(manipulation(ap -> ap.mount(true)))
                                         .then(literal("anything")
                                                 .executes(manipulation(ap -> ap.mount(false)))))
-                                .then(literal("dismount").executes(manipulation(EntityPlayerActionPack::dismount)))
-                                .then(literal("sneak").executes(manipulation(ap -> ap.setSneaking(true))))
-                                .then(literal("unsneak").executes(manipulation(ap -> ap.setSneaking(false))))
-                                .then(literal("sprint").executes(manipulation(ap -> ap.setSprinting(true))))
-                                .then(literal("unsprint").executes(manipulation(ap -> ap.setSprinting(false))))
+
+                                .then(literal("dismount")
+                                        .executes(manipulation(EntityPlayerActionPack::dismount)))
+
+                                .then(literal("sneak")
+                                        .executes(manipulation(ap -> ap.setSneaking(true))))
+                                .then(literal("unsneak")
+                                        .executes(manipulation(ap -> ap.setSneaking(false))))
+                                .then(literal("sprint")
+                                        .executes(manipulation(ap -> ap.setSprinting(true))))
+                                .then(literal("unsprint")
+                                        .executes(manipulation(ap -> ap.setSprinting(false))))
+
+                                .then(literal("move")
+                                        .executes(manipulation(EntityPlayerActionPack::stopMovement))
+                                        .then(literal("forward")
+                                                .executes(manipulation(ap -> ap.setForward(1))))
+                                        .then(literal("backward")
+                                                .executes(manipulation(ap -> ap.setForward(-1))))
+                                        .then(literal("left")
+                                                .executes(manipulation(ap -> ap.setStrafing(1))))
+                                        .then(literal("right")
+                                                .executes(manipulation(ap -> ap.setStrafing(-1)))))
+
+                                .then(literal("turn")
+                                        .then(literal("left")
+                                                .executes(manipulation(ap -> ap.turn(-90, 0))))
+                                        .then(literal("right")
+                                                .executes(manipulation(ap -> ap.turn(90, 0))))
+                                        .then(literal("back")
+                                                .executes(manipulation(ap -> ap.turn(180, 0))))
+                                        .then(argument("rotation", RotationArgument.rotation())
+                                                .executes(c -> manipulate(c,
+                                                        ap -> ap.turn(
+                                                                RotationArgument.getRotation(c, "rotation")
+                                                                        .getRotation(c.getSource())
+                                                        )))))
+
                                 .then(literal("look")
-                                        .then(literal("north").executes(manipulation(ap -> ap.look(Direction.NORTH))))
-                                        .then(literal("south").executes(manipulation(ap -> ap.look(Direction.SOUTH))))
-                                        .then(literal("east").executes(manipulation(ap -> ap.look(Direction.EAST))))
-                                        .then(literal("west").executes(manipulation(ap -> ap.look(Direction.WEST))))
-                                        .then(literal("up").executes(manipulation(ap -> ap.look(Direction.UP))))
-                                        .then(literal("down").executes(manipulation(ap -> ap.look(Direction.DOWN))))
+                                        .then(literal("north")
+                                                .executes(manipulation(ap -> ap.look(Direction.NORTH))))
+                                        .then(literal("south")
+                                                .executes(manipulation(ap -> ap.look(Direction.SOUTH))))
+                                        .then(literal("east")
+                                                .executes(manipulation(ap -> ap.look(Direction.EAST))))
+                                        .then(literal("west")
+                                                .executes(manipulation(ap -> ap.look(Direction.WEST))))
+                                        .then(literal("up")
+                                                .executes(manipulation(ap -> ap.look(Direction.UP))))
+                                        .then(literal("down")
+                                                .executes(manipulation(ap -> ap.look(Direction.DOWN))))
                                         .then(literal("at")
                                                 .then(argument("position", Vec3Argument.vec3())
                                                         .executes(c -> manipulate(c,
                                                                 ap -> ap.lookAt(Vec3Argument.getVec3(c, "position"))))))
                                         .then(argument("direction", RotationArgument.rotation())
                                                 .executes(c -> manipulate(c,
-                                                        ap -> ap.look(RotationArgument.getRotation(c, "direction")
-                                                                .getRotation(c.getSource()))))))
+                                                        ap -> ap.look(
+                                                                RotationArgument.getRotation(c, "direction")
+                                                                        .getRotation(c.getSource())
+                                                        )))))
                         )
         );
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> makeActionCommand(String name, ActionType type)
+    {
+        return literal(name)
+                .executes(manipulation(ap -> ap.start(type, Action.once())))
+                .then(literal("once")
+                        .executes(manipulation(ap -> ap.start(type, Action.once()))))
+                .then(literal("continuous")
+                        .executes(manipulation(ap -> ap.start(type, Action.continuous()))))
+                .then(literal("interval")
+                        .then(argument("ticks", IntegerArgumentType.integer(1))
+                                .executes(c -> manipulate(c,
+                                        ap -> ap.start(type,
+                                                Action.interval(IntegerArgumentType.getInteger(c, "ticks")))))));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> makeSwingCommand()
+    {
+        return literal("swing")
+                .executes(manipulation(EntityPlayerActionPack::stopSwing))
+                .then(literal("once")
+                        .executes(manipulation(ap -> ap.start(ActionType.SWING, Action.once()))))
+                .then(literal("continuous")
+                        .executes(manipulation(ap -> ap.start(ActionType.SWING, Action.continuous()))))
+                .then(literal("interval")
+                        .then(argument("ticks", IntegerArgumentType.integer(1))
+                                .executes(c -> manipulate(c,
+                                        ap -> ap.start(ActionType.SWING,
+                                                Action.interval(IntegerArgumentType.getInteger(c, "ticks")))))));
     }
 
     private static List<EntityPlayerMPFake> requireFakeTargets(CommandContext<CommandSourceStack> context)
@@ -139,28 +245,5 @@ public class PlayerCommand
     {
         requireFakeTargets(context);
         return 0;
-    }
-
-    private static LiteralArgumentBuilder<CommandSourceStack> makeActionCommand(String name, ActionType type)
-    {
-        return literal(name)
-                .executes(manipulation(ap -> ap.start(type, Action.once())))
-                .then(literal("once").executes(manipulation(ap -> ap.start(type, Action.once()))))
-                .then(literal("continuous").executes(manipulation(ap -> ap.start(type, Action.continuous()))));
-    }
-
-    private static LiteralArgumentBuilder<CommandSourceStack> makeSwingCommand()
-    {
-        return literal("swing")
-                .executes(manipulation(ap ->
-                        ap.start(ActionType.SWING, Action.swingOnce(null))))
-                .then(literal("mainhand")
-                        .executes(manipulation(ap ->
-                                ap.start(ActionType.SWING,
-                                        Action.swingOnce(InteractionHand.MAIN_HAND)))))
-                .then(literal("offhand")
-                        .executes(manipulation(ap ->
-                                ap.start(ActionType.SWING,
-                                        Action.swingOnce(InteractionHand.OFF_HAND)))));
     }
 }
