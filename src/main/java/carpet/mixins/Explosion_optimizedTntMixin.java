@@ -59,7 +59,7 @@ public abstract class Explosion_optimizedTntMixin
             eLogger.setAffectBlocks( ! list.isEmpty());
             eLogger.onExplosionDone(this.level.getGameTime());
         }
-        if (CarpetSettings.explosionNoBlockDamage)
+        if (CarpetSettings.explosionNoBlockDamage.enabled())
         {
             list.clear();
         }
@@ -71,7 +71,7 @@ public abstract class Explosion_optimizedTntMixin
             target ="Lnet/minecraft/world/level/ExplosionDamageCalculator;getBlockExplosionResistance(Lnet/minecraft/world/level/Explosion;Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/world/level/material/FluidState;)Ljava/util/Optional;"))
     private Optional<Float> noBlockCalcsWithNoBLockDamage(final ExplosionDamageCalculator instance, final Explosion explosion, final BlockGetter blockGetter, final BlockPos blockPos, final BlockState blockState, final FluidState fluidState)
     {
-        if (CarpetSettings.explosionNoBlockDamage) return Optional.of(Blocks.BEDROCK.getExplosionResistance());
+        if (CarpetSettings.explosionNoBlockDamage.enabled()) return Optional.of(Blocks.BEDROCK.getExplosionResistance());
         return instance.getBlockExplosionResistance(explosion, blockGetter, blockPos, blockState, fluidState);
     }
 
