@@ -5,6 +5,7 @@ import carpet.fakes.ServerPlayerInterface;
 import carpet.helpers.EntityPlayerActionPack;
 import carpet.helpers.EntityPlayerActionPack.Action;
 import carpet.helpers.EntityPlayerActionPack.ActionType;
+import carpet.helpers.ItemCooldown;
 import carpet.patches.EntityPlayerMPFake;
 import carpet.utils.CommandHelper;
 import carpet.utils.Messenger;
@@ -17,12 +18,18 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import net.minecraft.commands.CommandBuildContext;
 import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.arguments.EntityAnchorArgument;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.coordinates.RotationArgument;
 import net.minecraft.commands.arguments.coordinates.Vec3Argument;
+import net.minecraft.commands.arguments.item.ItemArgument;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -32,13 +39,11 @@ import java.util.function.Consumer;
 import static net.minecraft.commands.Commands.argument;
 import static net.minecraft.commands.Commands.literal;
 
-public class PlayerCommand
-{
+public class PlayerCommand {
     private static final SimpleCommandExceptionType NOT_FAKE =
             new SimpleCommandExceptionType(Component.literal("Only fake players can be targeted"));
 
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext ctx)
-    {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext ctx) {
         dispatcher.register(
                 literal("player")
                         .requires(src -> CommandHelper.canUseCommand(src, CarpetSettings.commandPlayer))
@@ -80,6 +85,17 @@ public class PlayerCommand
                                                                         ActionType.SWING,
                                                                         Action.interval(IntegerArgumentType.getInteger(c, "ticks"))
                                                                 ))))))
+
+                                .then(literal("itemCd")
+                                        .executes(ItemCooldown::itemCdClearAll)
+                                        .then(argument("item", ItemArgument.item(ctx))
+                                                .executes(ItemCooldown::itemCdAsk)
+                                                .then(literal("reset")
+                                                        .executes(ItemCooldown::itemCdReset))
+                                                .then(literal("set")
+                                                        .executes(ItemCooldown::itemCdSetDefault)
+                                                        .then(argument("ticks", IntegerArgumentType.integer(0))
+                                                                .executes(ItemCooldown::itemCdSetCustom)))))
 
                                 .then(literal("hotbar")
                                         .then(argument("slot", IntegerArgumentType.integer(1, 9))
@@ -150,6 +166,17 @@ public class PlayerCommand
                                                 .executes(manipulation(ap -> ap.look(Direction.UP))))
                                         .then(literal("down")
                                                 .executes(manipulation(ap -> ap.look(Direction.DOWN))))
+                                        .then(literal("upon")
+                                                .then(argument("entity", EntityArgument.entity())
+                                                        .executes(c -> lookUpon(c, LookMode.EYES))
+                                                        .then(literal("eyes")
+                                                                .executes(c -> lookUpon(c, LookMode.EYES)))
+                                                        .then(literal("feet")
+                                                                .executes(c -> lookUpon(c, LookMode.FEET)))
+                                                        .then(literal("closest")
+                                                                .executes(c -> lookUpon(c, LookMode.CLOSEST)))
+                                                )
+                                        )
                                         .then(literal("at")
                                                 .then(argument("position", Vec3Argument.vec3())
                                                         .executes(c -> manipulate(c,
@@ -164,8 +191,7 @@ public class PlayerCommand
         );
     }
 
-    private static LiteralArgumentBuilder<CommandSourceStack> makeActionCommand(String name, ActionType type)
-    {
+    private static LiteralArgumentBuilder<CommandSourceStack> makeActionCommand(String name, ActionType type) {
         return literal(name)
                 .executes(manipulation(ap -> ap.start(type, Action.once())))
                 .then(literal("once")
@@ -179,29 +205,12 @@ public class PlayerCommand
                                                 Action.interval(IntegerArgumentType.getInteger(c, "ticks")))))));
     }
 
-    private static LiteralArgumentBuilder<CommandSourceStack> makeSwingCommand()
-    {
-        return literal("swing")
-                .executes(manipulation(EntityPlayerActionPack::stopSwing))
-                .then(literal("once")
-                        .executes(manipulation(ap -> ap.start(ActionType.SWING, Action.once()))))
-                .then(literal("continuous")
-                        .executes(manipulation(ap -> ap.start(ActionType.SWING, Action.continuous()))))
-                .then(literal("interval")
-                        .then(argument("ticks", IntegerArgumentType.integer(1))
-                                .executes(c -> manipulate(c,
-                                        ap -> ap.start(ActionType.SWING,
-                                                Action.interval(IntegerArgumentType.getInteger(c, "ticks")))))));
-    }
-
     private static List<EntityPlayerMPFake> requireFakeTargets(CommandContext<CommandSourceStack> context)
-            throws CommandSyntaxException
-    {
+            throws CommandSyntaxException {
         Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "targets");
         List<EntityPlayerMPFake> fakes = new ArrayList<>();
 
-        for (ServerPlayer p : players)
-        {
+        for (ServerPlayer p : players) {
             if (!(p instanceof EntityPlayerMPFake fake))
                 throw NOT_FAKE.create();
             fakes.add(fake);
@@ -215,35 +224,75 @@ public class PlayerCommand
 
     private static int manipulate(CommandContext<CommandSourceStack> context,
                                   Consumer<EntityPlayerActionPack> action)
-            throws CommandSyntaxException
-    {
+            throws CommandSyntaxException {
         for (EntityPlayerMPFake fake : requireFakeTargets(context))
             action.accept(((ServerPlayerInterface) fake).getActionPack());
         return 1;
     }
 
-    private static Command<CommandSourceStack> manipulation(Consumer<EntityPlayerActionPack> action)
-    {
+    private static Command<CommandSourceStack> manipulation(Consumer<EntityPlayerActionPack> action) {
         return c -> manipulate(c, action);
     }
 
-    private static int kill(CommandContext<CommandSourceStack> context) throws CommandSyntaxException
-    {
+    private static int kill(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         for (EntityPlayerMPFake fake : requireFakeTargets(context))
             fake.kill(fake.serverLevel());
         return 1;
     }
 
-    private static int disconnect(CommandContext<CommandSourceStack> context) throws CommandSyntaxException
-    {
+    private static int disconnect(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         for (EntityPlayerMPFake fake : requireFakeTargets(context))
             fake.fakePlayerDisconnect(Messenger.s(""));
         return 1;
     }
 
-    private static int shadow(CommandContext<CommandSourceStack> context) throws CommandSyntaxException
-    {
+    private static int shadow(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         requireFakeTargets(context);
         return 0;
+    }
+
+    //look upon stuff
+
+    private enum LookMode {
+        EYES,
+        FEET,
+        CLOSEST
+    }
+
+    private static int lookUpon(CommandContext<CommandSourceStack> context, LookMode mode)
+            throws CommandSyntaxException {
+
+        Entity target = EntityArgument.getEntity(context, "entity");
+        Collection<ServerPlayer> players = EntityArgument.getPlayers(context, "targets");
+
+        for (ServerPlayer player : players) {
+            Vec3 eyePos = player.getEyePosition();
+            Vec3 lookTarget = switch (mode) {
+                case FEET -> target.position();
+                case EYES -> target.getEyePosition();
+                case CLOSEST -> closestPointToBox(
+                        eyePos,
+                        target.getBoundingBox()
+                );
+            };
+
+            if (player instanceof ServerPlayerInterface fake) {
+
+                fake.getActionPack().lookAt(lookTarget);
+            } else {
+
+                player.lookAt(EntityAnchorArgument.Anchor.EYES, lookTarget);
+            }
+        }
+
+        return players.size();
+    }
+
+    private static Vec3 closestPointToBox(Vec3 eye, AABB box) {
+        return new Vec3(
+                Mth.clamp(eye.x, box.minX, box.maxX),
+                Mth.clamp(eye.y, box.minY, box.maxY),
+                Mth.clamp(eye.z, box.minZ, box.maxZ)
+        );
     }
 }

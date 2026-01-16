@@ -31,13 +31,42 @@ public class DistanceCommand
                                                 Vec3Argument.getVec3(c, "fromPos"),
                                                 Vec3Argument.getVec3(c, "toPos"),
                                                 0))
+
                                         .then(literal("e")
                                                 .then(argument("exp", IntegerArgumentType.integer(0))
                                                         .executes(c -> run(
                                                                 c.getSource(),
                                                                 Vec3Argument.getVec3(c, "fromPos"),
                                                                 Vec3Argument.getVec3(c, "toPos"),
-                                                                IntegerArgumentType.getInteger(c, "exp"))))))))
+                                                                IntegerArgumentType.getInteger(c, "exp")))))
+
+                                        .then(literal("horizontal")
+                                                .executes(c -> runXZ(
+                                                        c.getSource(),
+                                                        Vec3Argument.getVec3(c, "fromPos"),
+                                                        Vec3Argument.getVec3(c, "toPos"),
+                                                        0))
+                                                .then(literal("e")
+                                                        .then(argument("exp", IntegerArgumentType.integer(0))
+                                                                .executes(c -> runXZ(
+                                                                        c.getSource(),
+                                                                        Vec3Argument.getVec3(c, "fromPos"),
+                                                                        Vec3Argument.getVec3(c, "toPos"),
+                                                                        IntegerArgumentType.getInteger(c, "exp"))))))
+
+                                        .then(literal("vertical")
+                                                .executes(c -> runY(
+                                                        c.getSource(),
+                                                        Vec3Argument.getVec3(c, "fromPos"),
+                                                        Vec3Argument.getVec3(c, "toPos"),
+                                                        0))
+                                                .then(literal("e")
+                                                        .then(argument("exp", IntegerArgumentType.integer(0))
+                                                                .executes(c -> runY(
+                                                                        c.getSource(),
+                                                                        Vec3Argument.getVec3(c, "fromPos"),
+                                                                        Vec3Argument.getVec3(c, "toPos"),
+                                                                        IntegerArgumentType.getInteger(c, "exp")))))))))
 
                 .then(argument("fromEntity", EntityArgument.entity())
                         .then(literal("to")
@@ -47,13 +76,42 @@ public class DistanceCommand
                                                 EntityArgument.getEntity(c, "fromEntity").position(),
                                                 Vec3Argument.getVec3(c, "toPos"),
                                                 0))
+
                                         .then(literal("e")
                                                 .then(argument("exp", IntegerArgumentType.integer(0))
                                                         .executes(c -> run(
                                                                 c.getSource(),
                                                                 EntityArgument.getEntity(c, "fromEntity").position(),
                                                                 Vec3Argument.getVec3(c, "toPos"),
-                                                                IntegerArgumentType.getInteger(c, "exp"))))))
+                                                                IntegerArgumentType.getInteger(c, "exp")))))
+
+                                        .then(literal("horizontal")
+                                                .executes(c -> runXZ(
+                                                        c.getSource(),
+                                                        EntityArgument.getEntity(c, "fromEntity").position(),
+                                                        Vec3Argument.getVec3(c, "toPos"),
+                                                        0))
+                                                .then(literal("e")
+                                                        .then(argument("exp", IntegerArgumentType.integer(0))
+                                                                .executes(c -> runXZ(
+                                                                        c.getSource(),
+                                                                        EntityArgument.getEntity(c, "fromEntity").position(),
+                                                                        Vec3Argument.getVec3(c, "toPos"),
+                                                                        IntegerArgumentType.getInteger(c, "exp"))))))
+
+                                        .then(literal("vertical")
+                                                .executes(c -> runY(
+                                                        c.getSource(),
+                                                        EntityArgument.getEntity(c, "fromEntity").position(),
+                                                        Vec3Argument.getVec3(c, "toPos"),
+                                                        0))
+                                                .then(literal("e")
+                                                        .then(argument("exp", IntegerArgumentType.integer(0))
+                                                                .executes(c -> runY(
+                                                                        c.getSource(),
+                                                                        EntityArgument.getEntity(c, "fromEntity").position(),
+                                                                        Vec3Argument.getVec3(c, "toPos"),
+                                                                        IntegerArgumentType.getInteger(c, "exp")))))))
 
                                 .then(argument("toEntity", EntityArgument.entity())
                                         .executes(c -> run(
@@ -61,28 +119,62 @@ public class DistanceCommand
                                                 EntityArgument.getEntity(c, "fromEntity").position(),
                                                 EntityArgument.getEntity(c, "toEntity").position(),
                                                 0))
+
                                         .then(literal("e")
                                                 .then(argument("exp", IntegerArgumentType.integer(0))
                                                         .executes(c -> run(
                                                                 c.getSource(),
                                                                 EntityArgument.getEntity(c, "fromEntity").position(),
                                                                 EntityArgument.getEntity(c, "toEntity").position(),
-                                                                IntegerArgumentType.getInteger(c, "exp")))))))));
+                                                                IntegerArgumentType.getInteger(c, "exp")))))
+
+                                        .then(literal("horizontal")
+                                                .executes(c -> runXZ(
+                                                        c.getSource(),
+                                                        EntityArgument.getEntity(c, "fromEntity").position(),
+                                                        EntityArgument.getEntity(c, "toEntity").position(),
+                                                        0))
+                                                .then(literal("e")
+                                                        .then(argument("exp", IntegerArgumentType.integer(0))
+                                                                .executes(c -> runXZ(
+                                                                        c.getSource(),
+                                                                        EntityArgument.getEntity(c, "fromEntity").position(),
+                                                                        EntityArgument.getEntity(c, "toEntity").position(),
+                                                                        IntegerArgumentType.getInteger(c, "exp"))))))
+
+                                        .then(literal("vertical")
+                                                .executes(c -> runY(
+                                                        c.getSource(),
+                                                        EntityArgument.getEntity(c, "fromEntity").position(),
+                                                        EntityArgument.getEntity(c, "toEntity").position(),
+                                                        0))
+                                                .then(literal("e")
+                                                        .then(argument("exp", IntegerArgumentType.integer(0))
+                                                                .executes(c -> runY(
+                                                                        c.getSource(),
+                                                                        EntityArgument.getEntity(c, "fromEntity").position(),
+                                                                        EntityArgument.getEntity(c, "toEntity").position(),
+                                                                        IntegerArgumentType.getInteger(c, "exp"))))))))));
+
 
         dispatcher.register(root);
     }
 
     private static int run(CommandSourceStack source, Vec3 from, Vec3 to, int exp)
     {
-        int scale = exp <= 0 ? 1 : (int)Math.pow(10, exp);
-        double dx = from.x - to.x;
-        double dy = from.y - to.y;
-        double dz = from.z - to.z;
+        return DistanceCalculator.distance(source, from, to, exp);
+    }
 
-        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        int result = (int)Math.round(dist * scale);
+    private static int runXZ(CommandSourceStack source, Vec3 from, Vec3 to, int exp)
+    {
+        Vec3 f = new Vec3(from.x, 0, from.z);
+        Vec3 t = new Vec3(to.x, 0, to.z);
+        return DistanceCalculator.distance(source, f, t, exp);
+    }
 
-        DistanceCalculator.distance(source, from, to);
-        return result;
+    private static int runY(CommandSourceStack source, Vec3 from, Vec3 to, int exp) {
+        Vec3 f = new Vec3(0, from.y, 0);
+        Vec3 t = new Vec3(0, to.y, 0);
+        return DistanceCalculator.distance(source, f, t, exp);
     }
 }

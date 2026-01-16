@@ -218,8 +218,16 @@ public class CarpetSettings
     public static String stackableShulkerBoxes = "false";
     public static int shulkerBoxStackSize = 1; // Referenced from Carpet extra
 
-    @Rule( desc = "Explosions won't destroy blocks", category = {CREATIVE, TNT} )
-    public static boolean explosionNoBlockDamage = false;
+    public enum ExplosionNoDmgMode {
+        TRUE, FALSE, MOST;
+
+        public boolean enabled() {
+            return this != FALSE;
+        }
+    }
+
+    @Rule(desc = "Explosions won't destroy blocks", category = {CREATIVE, TNT})
+    public static ExplosionNoDmgMode explosionNoBlockDamage = ExplosionNoDmgMode.FALSE;
 
     @Rule( desc = "Experience will drop from all experience barring blocks with any explosion type", category = {SURVIVAL, FEATURE})
     public static boolean xpFromExplosions = false;
@@ -1046,4 +1054,10 @@ public class CarpetSettings
             category = {COMMAND, EXPERIMENTAL}
     )
     public static boolean editablePlayerNbt = false;
+
+    @Rule(
+            desc = "Allows intentional game design explosions (from beds and respawn anchors) to not explode with fire",
+            category = {TNT, FEATURE}
+    )
+    public static boolean explosionNoFire = false;
 }
